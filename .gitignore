@@ -1,0 +1,56 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.*
+!.env.example
+secrets/
+.env.local
+backend/.env
+backend/.env.local
+backend/.env.*
+!backend/.env.example
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Raw model downloads used by scripts/prepare_leaf_model.py — the built
+# artifacts it produces (public/models/leaf-v1/) are what's tracked, not the
+# upstream ONNX files it downloads them from.
+.cache/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+!node_modules/.vite
+
+**/tempobook/dynamic/
+**/tempobook/storyboards/
+
+core
+
+# Saath account-provisioning secrets + generated credentials
+scripts/.artifacts/
+.env.seed-accounts.local
+
+**/tempobook/**
+.vercel

@@ -1,0 +1,227 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:wght@700;900&family=Manrope:wght@400;500;600;700&display=swap');
+
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* TerraLearn Light Theme - Earthy Premium */
+    --background: 42 29% 97%; /* Cream #FAF8F3 */
+    --foreground: 0 0% 17%; /* Charcoal #2C2C2C */
+
+    --card: 40 25% 98%;
+    --card-foreground: 0 0% 17%;
+
+    --popover: 40 25% 98%;
+    --popover-foreground: 0 0% 17%;
+
+    --primary: 143 44% 20%; /* Deep Forest Green #1A4D2E */
+    --primary-foreground: 42 29% 97%;
+
+    --secondary: 33 30% 41%; /* Warm Clay #8B6F47 */
+    --secondary-foreground: 42 29% 97%;
+
+    --muted: 42 20% 92%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 95 57% 38%; /* Vibrant Moss #4C9A2A */
+    --accent-foreground: 42 29% 97%;
+
+    --destructive: 10 63% 47%; /* Terracotta #C1502E */
+    --destructive-foreground: 42 29% 97%;
+
+    --border: 33 20% 82%;
+    --input: 33 20% 82%;
+    --ring: 143 44% 20%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+    .dark {
+      /* TerraLearn Dark Theme - Deep Earth */
+      --background: 160 15% 7%;
+      --foreground: 40 20% 90%;
+
+      --card: 160 12% 10%;
+      --card-foreground: 40 20% 90%;
+
+      --popover: 160 12% 10%;
+      --popover-foreground: 40 20% 90%;
+
+      --primary: 143 45% 45%;
+      --primary-foreground: 160 15% 7%;
+
+      --secondary: 33 25% 30%;
+      --secondary-foreground: 40 20% 90%;
+
+      --muted: 160 10% 15%;
+      --muted-foreground: 40 10% 55%;
+
+      --accent: 95 50% 45%;
+      --accent-foreground: 160 15% 7%;
+
+      --destructive: 10 60% 50%;
+      --destructive-foreground: 40 20% 90%;
+
+      --border: 160 10% 18%;
+      --input: 160 10% 18%;
+      --ring: 143 45% 45%;
+
+      --sidebar-background: 160 12% 8%;
+      --sidebar-foreground: 40 20% 90%;
+      --sidebar-primary: 143 45% 45%;
+      --sidebar-primary-foreground: 160 15% 7%;
+      --sidebar-accent: 160 10% 15%;
+      --sidebar-accent-foreground: 40 20% 90%;
+      --sidebar-border: 160 10% 18%;
+      --sidebar-ring: 143 45% 45%;
+    }
+  }
+
+  @layer base {
+    * {
+      @apply border-border;
+    }
+    body {
+      @apply bg-background text-foreground;
+      font-family: 'Manrope', sans-serif;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Fraunces', serif;
+    }
+    /* Subtle noise texture for depth */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+    }
+    .dark body::before {
+      opacity: 0.015;
+    }
+    /* MapLibre GL — match the Earthy theme */
+    .maplibregl-map {
+      font-family: 'Manrope', sans-serif;
+    }
+    .maplibregl-popup-content {
+      background: hsl(var(--card));
+      color: hsl(var(--card-foreground));
+      border: 1px solid hsl(var(--border));
+      border-radius: 0.6rem;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+      padding: 10px 12px;
+    }
+    .maplibregl-popup-close-button {
+      color: hsl(var(--muted-foreground));
+      font-size: 15px;
+      padding: 0 4px;
+    }
+    .maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: hsl(var(--card)); }
+    .maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: hsl(var(--card)); }
+    .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: hsl(var(--card)); }
+    .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: hsl(var(--card)); }
+    .maplibregl-ctrl-group {
+      border: none !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14) !important;
+      border-radius: 8px !important;
+      overflow: hidden;
+    }
+    .maplibregl-ctrl-attrib {
+      font-size: 10px;
+    }
+  }
+
+  /* Custom scrollbar */
+  @layer utilities {
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: hsl(var(--border));
+      border-radius: 3px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--muted-foreground));
+    }
+  }
+
+  /* --- HERO LANDING PAGE SPECIFIC CSS --- */
+  :root {
+    --live: oklch(0.72 0.11 75);
+    --live-soft: oklch(0.72 0.11 75 / 14%);
+    --vision: oklch(0.55 0.07 145);
+    --vision-soft: oklch(0.55 0.07 145 / 14%);
+    --hairline: oklch(1 0 0 / 9%);
+    --soil: oklch(0.72 0.11 75);
+    --foliage: oklch(0.55 0.07 145);
+    --bone: oklch(0.95 0.02 90);
+    --font-display: "Outfit", ui-sans-serif, system-ui, sans-serif;
+    --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  @layer utilities {
+    .text-balance-tight {
+      text-wrap: balance;
+      letter-spacing: -0.035em;
+      line-height: 0.95;
+    }
+    
+    .font-display { font-family: var(--font-display); }
+    .font-mono { font-family: var(--font-mono); }
+    .text-bone { color: var(--bone); }
+    .text-soil { color: var(--soil); }
+    .text-foliage { color: var(--foliage); }
+    .bg-soil { background-color: var(--soil); }
+    .bg-foliage { background-color: var(--foliage); }
+    .bg-hairline { background-color: var(--hairline); }
+    .border-soil { border-color: var(--soil); }
+    .border-foliage { border-color: var(--foliage); }
+    .border-hairline { border-color: var(--hairline); }
+    
+    .bg-soil\/30 { background-color: oklch(0.72 0.11 75 / 30%); }
+    .bg-soil\/10 { background-color: oklch(0.72 0.11 75 / 10%); }
+    .border-soil\/40 { border-color: oklch(0.72 0.11 75 / 40%); }
+    .bg-foliage\/10 { background-color: oklch(0.55 0.07 145 / 10%); }
+    .border-foliage\/40 { border-color: oklch(0.55 0.07 145 / 40%); }
+    .bg-bone\/5 { background-color: oklch(0.95 0.02 90 / 5%); }
+    .border-bone\/10 { border-color: oklch(0.95 0.02 90 / 10%); }
+    .border-bone\/20 { border-color: oklch(0.95 0.02 90 / 20%); }
+    .text-bone\/35 { color: oklch(0.95 0.02 90 / 35%); }
+    .text-bone\/45 { color: oklch(0.95 0.02 90 / 45%); }
+    .text-bone\/50 { color: oklch(0.95 0.02 90 / 50%); }
+    .text-bone\/65 { color: oklch(0.95 0.02 90 / 65%); }
+    .text-bone\/80 { color: oklch(0.95 0.02 90 / 80%); }
+
+    .grain {
+      background-image: radial-gradient(oklch(1 0 0 / 4%) 1px, transparent 1px);
+      background-size: 3px 3px;
+    }
+  }
+
+  @keyframes terra-drift {
+    0% { transform: translateY(0); opacity: 0.35; }
+    50% { transform: translateY(6px); opacity: 1; }
+    100% { transform: translateY(0); opacity: 0.35; }
+  }
