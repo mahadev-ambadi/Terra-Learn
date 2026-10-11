@@ -100,6 +100,12 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
+    /* a small two-leaf sprout glyph stands in for the default arrow, on-brand for a farm-data
+       site; hotspot sits where the leaves meet, roughly where an arrow's own tip would land */
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='30' viewBox='0 0 28 30'%3E%3Cline x1='14' y1='28' x2='14' y2='16' stroke='%23f3ecdc' stroke-width='2' stroke-linecap='round'/%3E%3Cellipse cx='9' cy='13' rx='7' ry='4' fill='%23c9a24a' transform='rotate(-35 9 13)'/%3E%3Cellipse cx='19' cy='11' rx='7' ry='4' fill='%237c9468' transform='rotate(35 19 11)'/%3E%3Ccircle cx='14' cy='16' r='1.6' fill='%23f3ecdc'/%3E%3C/svg%3E")
+        14 16,
+      auto;
   }
 
   ::selection {
@@ -168,21 +174,16 @@
 .hud-spin-b { animation: hud-spin-rev 34s linear infinite; }
 .hud-spin-c { animation: hud-spin 15s linear infinite; }
 
-/* preloader mark — never sits still while the page boots */
+/* preloader mark — never sits still while the page boots. only transform/opacity animate
+   here (compositor-only); box-shadow is a static property so it never forces a repaint. */
 @keyframes preloader-pulse {
-  0%, 100% {
-    transform: rotate(45deg) scale(1);
-    box-shadow: 0 0 16px var(--color-soil);
-    opacity: 0.8;
-  }
-  50% {
-    transform: rotate(58deg) scale(1.3);
-    box-shadow: 0 0 40px var(--color-soil);
-    opacity: 1;
-  }
+  0%, 100% { transform: rotate(45deg) scale(1); opacity: 0.85; }
+  50% { transform: rotate(58deg) scale(1.3); opacity: 1; }
 }
 .preloader-mark {
   animation: preloader-pulse 1.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  box-shadow: 0 0 28px var(--color-soil);
+  will-change: transform;
 }
 
 /* preloader rings — a plain circle rotating flat (Z-axis) shows no motion at all, so these tumble
@@ -200,9 +201,9 @@
   0% { transform: rotate3d(1, 1, 0, 0deg); }
   100% { transform: rotate3d(1, 1, 0, 360deg); }
 }
-.preloader-ring-a { animation: preloader-spin-a 3s linear infinite; transform-style: preserve-3d; }
-.preloader-ring-b { animation: preloader-spin-b 2.2s linear infinite; transform-style: preserve-3d; }
-.preloader-ring-c { animation: preloader-spin-c 1.5s linear infinite; transform-style: preserve-3d; }
+.preloader-ring-a { animation: preloader-spin-a 3s linear infinite; transform-style: preserve-3d; will-change: transform; }
+.preloader-ring-b { animation: preloader-spin-b 2.2s linear infinite; transform-style: preserve-3d; will-change: transform; }
+.preloader-ring-c { animation: preloader-spin-c 1.5s linear infinite; transform-style: preserve-3d; will-change: transform; }
 
 /* seeds flung outward from the rings — pop in near the ring, drift out, fade */
 @keyframes preloader-seed {
@@ -221,10 +222,11 @@
 }
 .preloader-seed {
   animation: preloader-seed 2.1s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+  will-change: transform, opacity;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .preloader-mark { animation: none; transform: rotate(45deg); box-shadow: 0 0 16px var(--color-soil); }
+  .preloader-mark { animation: none; transform: rotate(45deg); }
   .preloader-ring-a, .preloader-ring-b, .preloader-ring-c { animation: none; }
   .preloader-seed { display: none; }
 }
@@ -239,6 +241,16 @@
 .reveal-text-right .reveal-stagger {
   /* mirrored chapters sit on the right, so their blocks slide in from the right, not the left */
   transform: translateX(32px);
+}
+.reveal-text-zoom .reveal-stagger {
+  /* market's chapter pulls into focus instead of sliding in — scale up from slightly small
+     and soft, sharpening as it settles, pairing with that chapter's video wipe */
+  transform: scale(0.92);
+  filter: blur(6px);
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.18, 0.7, 0.2, 1), filter 0.6s ease;
+}
+.reveal-text-zoom.is-revealed .reveal-stagger {
+  filter: blur(0);
 }
 .is-revealed .reveal-stagger {
   opacity: 1;
@@ -271,6 +283,55 @@
 }
 .badge-shield {
   clip-path: polygon(50% 2%, 90% 18%, 90% 58%, 50% 98%, 10% 58%, 10% 18%);
+}
+
+/* cursor-following tile grid: a repeating pattern of small squares, revealed only where it
+   overlaps a small asymmetric cluster of three offset blocks centered on the pointer — a blocky,
+   irregular footprint instead of a smooth circular spotlight, unioned then intersected with the
+   tile pattern. small enough to read as a compact accent, not a big glow. */
+.cursor-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  /* soft-light with a neutral tone picks up whatever's underneath instead of imposing a new
+     color — it blends into the scene rather than sitting on top of it like a tinted overlay */
+  background-color: var(--bone);
+  mix-blend-mode: soft-light;
+  --cx: 50vw;
+  --cy: 50vh;
+  -webkit-mask-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  mask-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  -webkit-mask-size: 46px 46px, 30px 30px, 22px 22px, 24px 24px;
+  mask-size: 46px 46px, 30px 30px, 22px 22px, 24px 24px;
+  -webkit-mask-position:
+    calc(var(--cx) - 23px) calc(var(--cy) - 23px),
+    calc(var(--cx) + 10px) calc(var(--cy) - 36px),
+    calc(var(--cx) - 34px) calc(var(--cy) + 12px),
+    0 0;
+  mask-position:
+    calc(var(--cx) - 23px) calc(var(--cy) - 23px),
+    calc(var(--cx) + 10px) calc(var(--cy) - 36px),
+    calc(var(--cx) - 34px) calc(var(--cy) + 12px),
+    0 0;
+  -webkit-mask-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='46' height='46'%3E%3Crect x='2' y='2' width='42' height='42' rx='6' fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Crect x='2' y='2' width='26' height='26' rx='5' fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Crect x='2' y='2' width='18' height='18' rx='4' fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='3' y='3' width='16' height='16' rx='3' fill='black'/%3E%3C/svg%3E");
+  mask-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='46' height='46'%3E%3Crect x='2' y='2' width='42' height='42' rx='6' fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Crect x='2' y='2' width='26' height='26' rx='5' fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Crect x='2' y='2' width='18' height='18' rx='4' fill='black'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Crect x='3' y='3' width='16' height='16' rx='3' fill='black'/%3E%3C/svg%3E");
+  -webkit-mask-composite: source-over, source-over, source-in;
+  mask-composite: add, add, intersect;
+}
+
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .cursor-grid { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,47 +1,31 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { Toaster } from "sonner";
-import { ClerkProvider, ClerkLoaded, ClerkLoading } from "@clerk/clerk-react";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { I18nProvider } from "./lib/i18n/I18nProvider";
 import { BrandSplash } from "./components/BrandSplash";
-import { hasClerk, hasSupabase } from "./lib/saath/config";
-import { UnconfiguredApp } from "./auth/UnconfiguredApp";
-
-import { SignInPage, SignUpPage } from "./auth/AuthPages";
-import { clerkAppearance } from "./components/saath/clerkAppearance";
-import { RootGate } from "./auth/RootGate";
 import { Landing } from "../hero/src/routes/index";
 
-const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
+// the signed-in app (auth, dashboard, maps, charts) is split out so the landing page loads only
+// what it draws
+const AppShell = lazy(() => import("./AppShell"));
 
 function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
         <Toaster position="top-right" richColors theme="system" />
-      {!hasClerk || !hasSupabase ? (
-        <UnconfiguredApp />
-      ) : (
-        <ClerkProvider
-          publishableKey={clerkKey as string}
-          appearance={clerkAppearance}
-          signInUrl="/sign-in"
-          signUpUrl="/sign-up"
-          afterSignOutUrl="/sign-in"
-        >
-          <ClerkLoading>
-            <BrandSplash />
-          </ClerkLoading>
-          <ClerkLoaded>
-            <Routes>
-              <Route path="/sign-in/*" element={<SignInPage />} />
-              <Route path="/sign-up/*" element={<SignUpPage />} />
-              <Route path="/" element={<Landing />} />
-              <Route path="/*" element={<RootGate />} />
-            </Routes>
-          </ClerkLoaded>
-        </ClerkProvider>
-      )}
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route
+            path="*"
+            element={
+              <Suspense fallback={<BrandSplash />}>
+                <AppShell />
+              </Suspense>
+            }
+          />
+        </Routes>
       </I18nProvider>
     </ThemeProvider>
   );
