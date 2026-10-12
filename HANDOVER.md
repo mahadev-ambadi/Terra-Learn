@@ -210,8 +210,7 @@ Backend (unchanged this session): `backend/` FastAPI, `python run_backend.py` or
 6. **`backend/.env.local`** still has real Groq/OpenRouter keys — rotate before the repo goes
    public.
 7. **`.env.seed-accounts.local`** has the Clerk secret key — gitignored, keep it that way.
-8. Two untracked scratch files in the repo root (`New Text Document.txt`, `SIH PS's.txt`) —
-   yours; not committed.
+8. The SIH problem statements scratch file now lives at `docs/sih-problem-statements.txt`.
 9. `seed/53_demo_scenario.sql` keeps the old filename though it's now "starter history", not
    a demo scenario.
 

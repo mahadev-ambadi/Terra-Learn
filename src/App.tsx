@@ -4,7 +4,7 @@ import { Toaster } from "sonner";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { I18nProvider } from "./lib/i18n/I18nProvider";
 import { BrandSplash } from "./components/BrandSplash";
-import { Landing } from "../hero/src/routes/index";
+import { Landing } from "../hero/src/landing/Landing";
 
 // the signed-in app (auth, dashboard, maps, charts) is split out so the landing page loads only
 // what it draws
