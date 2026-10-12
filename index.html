@@ -5,75 +5,36 @@
     <link rel="icon" type="image/svg+xml" href="/terralearn-icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TerraLearn — Precision Agriculture Simulator</title>
-    <!-- the landing's display faces, requested first so the loader's type is ready on arrival -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Kaushan+Script&family=JetBrains+Mono:wght@400;500&display=swap" />
-    <!-- Boot loader: paints on the very first frame, before any JavaScript module has arrived. It
-         is the first frame of the React loader (hero/src/landing/Loader.tsx): same soil, same dial,
-         same wordmark and counter in the same places. That loader removes it on mount and carries
-         on from window.__bootPct, so the handoff is invisible. Landing route only. -->
+    <!-- the journey's face (Saira), requested first so the WebGL headline can be drawn with it -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" />
+    <!-- Boot screen: paints on the first frame, before any module arrives, in the hero's own
+         green so the hand-off is seamless. The journey (hero/src/journey/Journey.tsx) fades it
+         out once WebGL has drawn its first frame. Landing route only. -->
     <style>
       #boot-loader {
-        position: fixed; inset: 0; z-index: 99; overflow: hidden; color: #f3ecdc;
-        background: radial-gradient(120% 90% at 50% 45%, #0d3a26 0%, #06241a 46%, #02110b 100%);
-        font-family: ui-sans-serif, system-ui, sans-serif;
+        position: fixed; inset: 0; z-index: 99; display: grid; place-items: center;
+        background: radial-gradient(110% 90% at 55% 40%, #2b543c 0%, #0e2419 70%);
+        color: #f3f5ef; font-family: "Saira", system-ui, sans-serif;
+        transition: opacity 0.8s ease, visibility 0s linear 0.8s;
       }
-      #boot-loader .dial {
-        position: absolute; left: 50%; top: 42%; width: min(56vmin, 460px); aspect-ratio: 1; translate: -50% -50%;
-        border-radius: 50%;
-        background: repeating-conic-gradient(from -1deg, rgba(200, 255, 225, 0.14) 0 2deg, transparent 2deg 6deg);
-        -webkit-mask: radial-gradient(closest-side, transparent 83%, #000 84%, #000 91%, transparent 92%);
-        mask: radial-gradient(closest-side, transparent 83%, #000 84%, #000 91%, transparent 92%);
+      #boot-loader.is-done { opacity: 0; visibility: hidden; }
+      #boot-loader .word { margin: 0; font-weight: 800; font-size: 13px; letter-spacing: 0.42em; text-transform: uppercase; opacity: 0.9; }
+      #boot-loader .bar { position: relative; width: 120px; height: 1px; margin-top: 18px; overflow: hidden; background: rgba(243, 245, 239, 0.2); }
+      #boot-loader .bar::after {
+        content: ""; position: absolute; inset: 0; background: #f3f5ef; transform-origin: left;
+        animation: boot-fill 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
       }
-      #boot-loader .glow {
-        position: absolute; left: 50%; top: 38%; width: 40vmin; height: 40vmin; translate: -50% -50%; border-radius: 50%;
-        background: radial-gradient(closest-side, rgba(0, 224, 176, 0.18), transparent 70%);
-        animation: boot-breathe 2.4s ease-in-out infinite;
-      }
-      @keyframes boot-breathe { 50% { opacity: 0.45; scale: 0.92; } }
-      #boot-loader .word {
-        position: absolute; left: 50%; top: calc(42% + min(28vmin, 230px) + 26px); translate: -50% 0; margin: 0;
-        font-family: "Anton", Impact, sans-serif; text-transform: uppercase; font-size: clamp(30px, 4.4vw, 60px);
-        letter-spacing: 0.08em; line-height: 1; color: rgba(200, 255, 225, 0.08); white-space: nowrap;
-      }
-      #boot-loader .phrase {
-        position: absolute; left: clamp(20px, 3.4vw, 56px); bottom: calc(clamp(18px, 4vh, 40px) + 14px); margin: 0;
-        font: 11px "JetBrains Mono", ui-monospace, monospace; letter-spacing: 0.22em; text-transform: uppercase; color: rgba(210, 255, 230, 0.78);
-      }
-      #boot-loader .count {
-        position: absolute; right: clamp(20px, 3.4vw, 56px); bottom: clamp(18px, 4vh, 40px); margin: 0;
-        font-family: "Anton", Impact, sans-serif; font-size: clamp(84px, 12vw, 200px); line-height: 0.82;
-        color: transparent; -webkit-text-stroke: 1px rgba(200, 255, 225, 0.32); font-variant-numeric: tabular-nums;
-      }
-      @media (max-width: 640px) {
-        #boot-loader .dial { width: min(78vw, 52vh); }
-        #boot-loader .word { top: calc(42% + min(39vw, 26vh) + 18px); }
-      }
+      @keyframes boot-fill { from { transform: scaleX(0); } to { transform: scaleX(0.9); } }
     </style>
   </head>
   <body>
     <div id="boot-loader" aria-hidden="true">
-      <div class="glow"></div>
-      <div class="dial"></div>
-      <p class="word">TerraLearn</p>
-      <p class="phrase">Reading the soil</p>
-      <p class="count">00</p>
+      <div><p class="word">TerraLearn</p><div class="bar"></div></div>
     </div>
     <script>
-      (function () {
-        var el = document.getElementById("boot-loader");
-        if (location.pathname !== "/") { el.remove(); return; }
-        var count = el.querySelector(".count"), t0 = performance.now();
-        // eases toward 40% while the modules load; the React loader continues from here
-        (function tick() {
-          if (!el.isConnected) return;
-          var p = 40 * (1 - Math.exp(-(performance.now() - t0) / 700));
-          window.__bootPct = p;
-          count.textContent = String(Math.round(p)).padStart(2, "0");
-          requestAnimationFrame(tick);
-        })();
-      })();
+      if (location.pathname !== "/") document.getElementById("boot-loader").remove();
     </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
