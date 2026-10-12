@@ -54,3 +54,6 @@ scripts/.artifacts/
 
 **/tempobook/**
 .vercel
+
+# crash dumps from Git Bash on Windows
+*.stackdump

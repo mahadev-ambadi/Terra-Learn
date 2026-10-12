@@ -15,8 +15,20 @@
     "jsx": "react-jsx",
 
     "strict": false,
+    // src/App.tsx imports the landing page from hero/src, whose files use "@/" for hero/src.
+    // At build time the atAlias plugin in vite.config.ts picks the right base per importer;
+    // tsc can't, so it falls back to hero/src for anything not found in src. Keep "@/" paths
+    // unique across the two trees or tsc will resolve a hero import to the root copy.
+    // The react/three entries mirror resolve.dedupe in vite.config.ts: without them, hero/src
+    // files would get types from hero/node_modules (a different React major).
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*", "./hero/src/*"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"],
+      "react-dom/*": ["./node_modules/@types/react-dom/*"],
+      "three": ["./node_modules/@types/three"],
+      "three/*": ["./node_modules/@types/three/*"]
     }
   },
   "include": ["src"],
