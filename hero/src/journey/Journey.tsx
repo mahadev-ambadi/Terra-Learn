@@ -9,8 +9,16 @@ import "./journey.css";
 
 const TITLE = ["Farming.", "Revolutionized."];
 const TITLE_FONT = "Saira, 'Arial Black', sans-serif";
-const TITLE_Y = 0.53;
+// below the cob in the hero film
+const TITLE_Y = 0.76;
 const PLOTS_IMAGE = "/media/landing/aerial-sm.webp";
+
+/** real footage as still-frame sequences (public/media/journey/<name>/{d,m}/NNN.webp) */
+const film = (name: string, count: number) => ({
+  count,
+  url: (set: "d" | "m", i: number) => `/media/journey/${name}/${set}/${String(i).padStart(3, "0")}.webp`,
+});
+const FILMS = { cob: film("cob", 96), seedling: film("seedling", 120), kernel: film("kernel", 72) };
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789#%&*+/<>";
@@ -230,6 +238,7 @@ export function Journey() {
           titleY: TITLE_Y,
           fieldImage,
           plotsImage: PLOTS_IMAGE,
+          films: FILMS,
           onTitleLayout: (bottom, fs) => {
             heroRef.current?.style.setProperty("--jr-title-bottom", `${bottom}px`);
             heroRef.current?.style.setProperty("--jr-title-fs", `${fs}px`);
@@ -288,6 +297,7 @@ export function Journey() {
 
       {/* chapter 1 — underground: helix, constellation, seedling */}
       <div ref={layer(1)} className="jr-layer" data-chapter={CHAPTERS[1]}>
+        <div className="jr-shade" aria-hidden="true" />
         {SECTIONS.filter((s) => s.chapter === 1).map((s) => (
           <SectionBlock key={s.id} s={s} active={active === s.id} reduced={reduced} />
         ))}

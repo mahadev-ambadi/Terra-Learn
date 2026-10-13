@@ -7,23 +7,15 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { covers, span } from "./timeline";
-import {
-  HUSK,
-  LEAF_DARK,
-  kernelGeometry,
-  kernelMaterial,
-  leafMaterial,
-  makeCob,
-  makePlant,
-  makeSprout,
-  makeWind,
-  ribbonGeometry,
-  rng,
-  type Wind,
-} from "./maize";
+import { createFilm, type Film, type FilmSet } from "./filmTexture";
+import { kernelGeometry, kernelMaterial, makePlant, makeWind, rng } from "./maize";
+
+export type FilmSource = { count: number; url: (set: FilmSet, i: number) => string };
 
 export type EngineOptions = {
   mobile: boolean;
+  /** real footage, as still-frame sequences: hero cob, germination, falling kernel */
+  films: { cob: FilmSource; seedling: FilmSource; kernel: FilmSource };
   /** headline drawn as particles in the hero */
   titleLines: string[];
   titleFont: string;
@@ -55,6 +47,26 @@ const NOISE = /* glsl */ `
   }
   float fbm(vec2 p){ float s = 0.0, a = 0.5; for(int i=0;i<5;i++){ s += a*vnoise(p); p *= 2.03; a *= 0.5; } return s; }
 `;
+
+/** cover-fits a film into the backdrop, like object-fit: cover with object-position = uFocus */
+const COVER = /* glsl */ `
+  uniform sampler2D uFilm; uniform float uFilmAspect, uZoom; uniform vec2 uFocus;
+  vec2 coverUv(vec2 uv){
+    float va = uRes.x/uRes.y; vec2 s = vec2(1.0);
+    if (va > uFilmAspect) s.y = uFilmAspect/va; else s.x = va/uFilmAspect;
+    s /= uZoom;
+    return (uv - 0.5)*s + 0.5 + (uFocus - 0.5)*(1.0 - s);
+  }
+`;
+
+function filmUniforms(film: Film, zoom: number, focus: [number, number]) {
+  return {
+    uFilm: { value: film.texture },
+    uFilmAspect: { value: 16 / 9 },
+    uZoom: { value: zoom },
+    uFocus: { value: new THREE.Vector2(...focus) },
+  };
+}
 
 /** full-screen quad drawn first in a chapter; slides with the card via uOffY */
 function backdrop(fragBody: string, uniforms: Record<string, THREE.IUniform>) {
@@ -187,6 +199,18 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
   const disposables: { dispose: () => void }[] = [];
   const track = <T extends { dispose: () => void }>(x: T) => (disposables.push(x), x);
 
+  // the hero's film loads at once; the others start once the visitor heads their way (or after
+  // a few idle seconds), so they never compete with the first screen
+  const filmSet: FilmSet = window.innerWidth * Math.min(window.devicePixelRatio || 1, 2) > 1100 ? "d" : "m";
+  const films = {
+    cob: createFilm(opts.films.cob.count, opts.films.cob.url, filmSet),
+    seedling: createFilm(opts.films.seedling.count, opts.films.seedling.url, filmSet),
+    kernel: createFilm(opts.films.kernel.count, opts.films.kernel.url, filmSet),
+  };
+  films.cob.load();
+  const lateLoads = [window.setTimeout(() => films.seedling.load(), 5000), window.setTimeout(() => films.kernel.load(), 8000)];
+  track({ dispose: () => (lateLoads.forEach(clearTimeout), Object.values(films).forEach((f) => f.dispose())) });
+
   /* ---------------------------- hero ------------------------------ */
 
   const hero = (() => {
@@ -197,54 +221,26 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
     camera.position.set(0, 0, 12.5);
     lights(scene, "#fff0cf", 2.6, "#a8f0cf", 2.2);
 
+    const heroFilm = filmUniforms(films.cob, 1.03, [0.5, 0.5]);
+    const uHeroMix = { value: 0 };
+    const uShift = { value: new THREE.Vector2() };
     const bd = backdrop(
       /* glsl */ `
+      uniform float uMix; uniform vec2 uShift;
+      ${COVER}
       void main(){
         vec2 q = vUv - vec2(0.55, 0.62); q.x *= uRes.x/uRes.y;
-        float r = length(q);
-        vec3 c = mix(vec3(0.19,0.36,0.27), vec3(0.055,0.15,0.11), smoothstep(0.0, 1.05, r));
-        c *= 0.9 + 0.2*fbm(vUv*3.0 + uTime*0.02);
-        c += (hash21(vUv*uRes + uTime) - 0.5) * 0.025;
+        vec3 c = mix(vec3(0.19,0.36,0.27), vec3(0.055,0.15,0.11), smoothstep(0.0, 1.05, length(q)));
+        c = mix(c, texture2D(uFilm, coverUv(vUv) + uShift).rgb, uMix);
+        // settle the lower band so the headline reads over the silk
+        c *= mix(0.62, 1.0, smoothstep(0.02, 0.42, vUv.y));
+        c += (hash21(vUv*uRes + uTime) - 0.5) * 0.02;
         gl_FragColor = vec4(c, 1.0);
       }`,
-      {},
+      { ...heroFilm, uMix: uHeroMix, uShift },
     );
     scene.add(bd);
 
-    const rig = new THREE.Group();
-    rig.position.set(0.25, 1.05, 0);
-    scene.add(rig);
-    const cob = makeCob(wind, 3.1);
-    cob.rotation.set(0.1, 0, -0.16);
-    rig.add(cob);
-
-    // dark leaves fanned behind the ear, as on a plant photographed close
-    const darkMat = leafMaterial(LEAF_DARK, wind, { roughness: 0.6 });
-    const R = rng(11);
-    const leafSpecs = [
-      { x: -0.4, y: -3.0, z: -1.6, az: Math.PI * 1.05, tilt: -0.35, len: 6.5, bend: 1.0 },
-      { x: 0.6, y: -3.1, z: -1.4, az: Math.PI * -0.05, tilt: -0.3, len: 6.2, bend: 1.2 },
-      { x: 0.0, y: -3.2, z: -2.4, az: Math.PI * 0.62, tilt: -0.12, len: 7.0, bend: 0.5 },
-      { x: -0.9, y: -2.6, z: -0.8, az: Math.PI * 0.9, tilt: -0.7, len: 5.0, bend: 1.5 },
-      { x: 1.1, y: -2.8, z: -0.6, az: Math.PI * 0.12, tilt: -0.75, len: 5.2, bend: 1.4 },
-    ];
-    for (const s of leafSpecs) {
-      const leaf = new THREE.Mesh(
-        ribbonGeometry({ length: s.len, width: 0.62, bend: s.bend, bendStart: 0.25, fold: 0.18, wave: 0.07, twist: (R() - 0.5) * 0.8 }),
-        darkMat,
-      );
-      leaf.position.set(s.x, s.y, s.z);
-      leaf.rotation.y = -s.az;
-      leaf.rotateZ(s.tilt);
-      rig.add(leaf);
-    }
-    // a husk-coloured shank leaf under the ear
-    {
-      const leaf = new THREE.Mesh(ribbonGeometry({ length: 2.4, width: 0.5, bend: 0.4, bendStart: 0.4, fold: 0.3 }), leafMaterial(HUSK, wind));
-      leaf.position.set(0.2, -2.6, -0.3);
-      leaf.rotation.y = -Math.PI * 0.4;
-      rig.add(leaf);
-    }
 
     /* headline as particles that scatter around the cursor */
     const overlay = { scene: new THREE.Scene(), camera: new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10) };
@@ -376,11 +372,12 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
           const y = -(opts.titleY - 0.5) * H + Math.sin(wanderT * 0.81) * 30;
           ch.pushTrail(x, y, 0.32, t * 1000);
         }
-        const k = easeOut(intro);
-        rig.scale.setScalar(0.86 + 0.14 * k);
-        rig.rotation.y = (1 - k) * -0.9 + Math.sin(t * 0.25) * 0.18 + pointerSm.x * 0.22;
-        rig.rotation.x = pointerSm.y * 0.08;
-        rig.position.y = 1.05 + Math.sin(t * 0.6) * 0.05 + p * 2;
+        // the cob film breathes back and forth (cosine ping-pong: no seam, no hard reversal)
+        films.cob.draw(0.5 - 0.5 * Math.cos((Math.PI * t) / 8), 0);
+        heroFilm.uFilmAspect.value = films.cob.aspect();
+        if (films.cob.ready()) uHeroMix.value = Math.min(1, uHeroMix.value + dt * 1.5);
+        uShift.value.set(-pointerSm.x * 0.006, -pointerSm.y * 0.006);
+        heroFilm.uZoom.value = 1.03 + p * 0.5;
       },
     };
     return ch;
@@ -396,12 +393,16 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
     camera.position.set(0, 0, 10);
     lights(scene, "#fff2d8", 2.2, "#9fe8d8", 1.6);
 
+    // desktop: crop toward the film's left so the seedling sits right of the text column
+    const seedFilm = opts.mobile ? filmUniforms(films.seedling, 1, [0.5, 0.7]) : filmUniforms(films.seedling, 1.25, [0, 0.85]);
+    const uSeedMix = { value: 0 };
     // soil → dark → teal → green-teal, with soil specks early on
     const uPhase = { value: 0 };
     const uSoil = { value: 1 };
     const bd = backdrop(
       /* glsl */ `
-      uniform float uPhase, uSoil;
+      uniform float uPhase, uSoil, uMix;
+      ${COVER}
       void main(){
         vec3 soil = vec3(0.16,0.15,0.135), dark = vec3(0.07,0.075,0.07), teal = vec3(0.06,0.2,0.19), green = vec3(0.1,0.25,0.22);
         vec3 c = mix(soil, dark, smoothstep(0.0, 0.25, uPhase));
@@ -413,10 +414,11 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
         c *= 0.85 + 0.3*n*mix(0.4, 1.0, uSoil);
         float speck = step(0.985, hash21(floor(vUv*uRes/2.0)));
         c += speck * 0.18 * uSoil;
+        c = mix(c, texture2D(uFilm, coverUv(vUv)).rgb, uMix);
         c += (hash21(vUv*uRes + uTime) - 0.5) * 0.03;
         gl_FragColor = vec4(c, 1.0);
       }`,
-      { uPhase, uSoil },
+      { uPhase, uSoil, ...seedFilm, uMix: uSeedMix },
     );
     scene.add(bd);
 
@@ -598,108 +600,6 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
     kernels.frustumCulled = false;
     scene.add(kernels);
 
-    // --- seedling in a glass cube of soil ---
-    const pot = new THREE.Group();
-    scene.add(pot);
-    const glassMat = new THREE.MeshPhysicalMaterial({
-      color: "#2c403b",
-      roughness: 0.12,
-      metalness: 0,
-      transparent: true,
-      opacity: 0.42,
-      clearcoat: 1,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    const cube = (w: number, h: number, d: number) => {
-      const g = new THREE.Group();
-      const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), glassMat);
-      g.add(box);
-      g.add(
-        new THREE.LineSegments(
-          new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d)),
-          new THREE.LineBasicMaterial({ color: "#d9efe8", transparent: true, opacity: 0.18 }),
-        ),
-      );
-      return g;
-    };
-    const main = cube(2.4, 2.0, 2.4);
-    pot.add(main);
-    // the soil itself: a dark translucent block inside the glass, so the roots read against it
-    const soilBlock = new THREE.Mesh(
-      new THREE.BoxGeometry(2.3, 1.75, 2.3),
-      new THREE.MeshStandardMaterial({ color: "#2a211a", roughness: 1, transparent: true, opacity: 0.62, depthWrite: false }),
-    );
-    soilBlock.position.y = -0.1;
-    soilBlock.renderOrder = 1;
-    main.add(soilBlock);
-    const soilPts = glowPoints({
-      count: opts.mobile ? 700 : 1400,
-      fill(i, pos, col, size, seed) {
-        pos.set([(R() - 0.5) * 2.3, -1 + R() * 1.8, (R() - 0.5) * 2.3], i * 3);
-        const b = 0.25 + R() * 0.35;
-        col.set([b * 0.9, b * 0.75, b * 0.6], i * 3);
-        size[i] = 4 + R() * 5;
-        seed[i] = R();
-      },
-      additive: false,
-      core: 0.7,
-    });
-    soilPts.mat.uniforms.uAlpha!.value = 0.7;
-    soilPts.points.renderOrder = 2;
-    main.add(soilPts.points);
-    // roots: branching random walks from the seed downward
-    const rootPos: number[] = [];
-    const rootS: number[] = [];
-    const walk = (x: number, y: number, z: number, dx: number, dz: number, len: number, depth: number, s0: number) => {
-      let px = x, py = y, pz = z;
-      const steps = Math.floor(len * 18);
-      for (let i = 0; i < steps; i++) {
-        const nx = px + dx * 0.05 + (R() - 0.5) * 0.04;
-        const ny = py - 0.055 - R() * 0.02;
-        const nz = pz + dz * 0.05 + (R() - 0.5) * 0.04;
-        if (ny < -0.95) break;
-        rootPos.push(px, py, pz, nx, ny, nz);
-        const s = s0 + (i / steps) * (1 - s0);
-        rootS.push(s, s);
-        px = nx; py = ny; pz = nz;
-        if (depth < 2 && R() < 0.05) walk(px, py, pz, dx + (R() - 0.5) * 1.6, dz + (R() - 0.5) * 1.6, len * 0.5, depth + 1, s);
-      }
-    };
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * 6.28;
-      walk(0, 0.78, 0, Math.cos(a) * 0.5, Math.sin(a) * 0.5, 1.6 + R() * 0.6, 0, 0);
-    }
-    const rgeo = new THREE.BufferGeometry();
-    rgeo.setAttribute("position", new THREE.Float32BufferAttribute(rootPos, 3));
-    rgeo.setAttribute("aS", new THREE.Float32BufferAttribute(rootS, 1));
-    const rmat = new THREE.ShaderMaterial({
-      uniforms: { uGrow: { value: 0 } },
-      vertexShader: /* glsl */ `attribute float aS; varying float vS; void main(){ vS = aS; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: /* glsl */ `uniform float uGrow; varying float vS; void main(){ if (vS > uGrow) discard; float a = 0.75*(1.0 - vS*0.5); gl_FragColor = vec4(vec3(0.98,0.95,0.85)*a, a); }`,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    });
-    const roots = new THREE.LineSegments(rgeo, rmat);
-    roots.renderOrder = 3;
-    main.add(roots);
-    const seed = new THREE.Mesh(kGeo, kMat);
-    seed.scale.setScalar(0.17);
-    seed.position.set(0, 0.86, 0);
-    seed.rotation.z = Math.PI * 0.55;
-    main.add(seed);
-    const sprout = makeSprout(wind);
-    sprout.position.set(0, 0.95, 0);
-    main.add(sprout);
-    // out-of-focus cubes behind
-    const back1 = cube(2.4, 2.0, 2.4);
-    back1.position.set(4.8, 2.8, -11);
-    const back2 = cube(2.4, 2.0, 2.4);
-    back2.position.set(3.6, 0.4, -7);
-    pot.add(back1, back2);
-
-    const uRise = { t: 0 };
     const ch: Chapter = {
       scene,
       camera,
@@ -711,7 +611,6 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
         uSoil.value = 1 - span(p, 0.12, 0.3) * 0.75;
         fmat.uniforms.uTime!.value = t;
         dust.mat.uniforms.uTime!.value = t;
-        uRise.t = t;
         dust.mat.uniforms.uRise!.value = t * 0.15 + p * 30;
         dust.mat.uniforms.uAlpha!.value = 0.55 + 0.25 * span(p, 0.1, 0.2);
 
@@ -763,16 +662,12 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
           kernels.instanceMatrix.needsUpdate = true;
         }
 
-        // the seedling cube rises into place and the sprout grows
-        const pIn = span(p, 0.44, 0.52);
-        pot.visible = pIn > 0;
-        pot.position.set(opts.mobile ? 0 : 1.9, -9 + ease(pIn) * 8.6 - (opts.mobile ? 1.4 : 0), 0);
-        main.rotation.y = 0.6 + p * 3 + Math.sin(t * 0.3) * 0.05;
-        main.rotation.x = 0.28;
-        const grow = easeOut(span(p, 0.47, 0.57));
-        rmat.uniforms.uGrow!.value = grow;
-        sprout.scale.setScalar(Math.max(0.001, grow * 1.25));
-        soilPts.mat.uniforms.uTime!.value = t;
+        // the kernels land in soil: the germination film fades in and the scroll grows it
+        const fm = span(p, 0.45, 0.5) * (films.seedling.ready() ? 1 : 0);
+        uSeedMix.value = fm;
+        if (p > 0.4 && p < 0.65) films.seedling.draw(span(p, 0.47, 0.56), 0);
+        seedFilm.uFilmAspect.value = films.seedling.aspect();
+        dust.mat.uniforms.uAlpha!.value *= 1 - fm * 0.75;
       },
     };
     return ch;
@@ -950,34 +845,23 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     camera.position.set(0, 0, 10);
     lights(scene, "#fff0c8", 3, "#a0fff0", 2);
+    const outroFilm = filmUniforms(films.kernel, 1, [0.5, 0.5]);
+    const uOutroMix = { value: 0 };
     const bd = backdrop(
       /* glsl */ `
+      uniform float uMix;
+      ${COVER}
       void main(){
         vec2 q = vUv - vec2(0.5, 0.75); q.x *= uRes.x/uRes.y;
         vec3 c = mix(vec3(0.15,0.37,0.33), vec3(0.07,0.2,0.18), smoothstep(0.0, 1.1, length(q)));
         c *= 0.92 + 0.12*fbm(vUv*4.0 + uTime*0.02);
+        c = mix(c, texture2D(uFilm, coverUv(vUv)).rgb, uMix);
         c += (hash21(vUv*uRes + uTime) - 0.5) * 0.02;
         gl_FragColor = vec4(c, 1.0);
       }`,
-      {},
+      { ...outroFilm, uMix: uOutroMix },
     );
     scene.add(bd);
-    const kernel = new THREE.Mesh(kernelGeometry(64), kernelMaterial());
-    kernel.scale.setScalar(1.15);
-    scene.add(kernel);
-    const R = rng(31);
-    const sparks = glowPoints({
-      count: 160,
-      fill(i, pos, col, size, seed) {
-        const a = R() * 6.28, r = 0.6 + R() * 1.4;
-        pos.set([Math.cos(a) * r, -0.5 - R() * 3, Math.sin(a) * r * 0.6], i * 3);
-        col.set([1, 0.85, 0.5], i * 3);
-        size[i] = 0.8 + R() * 1.8;
-        seed[i] = R();
-      },
-      core: 0.3,
-    });
-    kernel.add(sparks.points);
 
     const ch: Chapter = {
       scene,
@@ -985,11 +869,10 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
       clear: new THREE.Color("#163f39"),
       backdrop: bd,
       update(p, t) {
-        // camera half-height at z=10, fov 34 ≈ 3.06: park the kernel just over the top edge
-        kernel.position.set(0, 3.35 - (1 - span(p, 0.88, 1)) * 0.6, 0);
-        kernel.rotation.set(0.2 + Math.sin(t * 0.4) * 0.1, t * 0.35, Math.PI + 0.25);
-        sparks.mat.uniforms.uTime!.value = t;
-        sparks.mat.uniforms.uRise!.value = -t * 0.3;
+        // the falling kernel is scrubbed by the scroll across the outro
+        if (p > 0.85) films.kernel.draw(span(p, 0.88, 1), 0);
+        outroFilm.uFilmAspect.value = films.kernel.aspect();
+        uOutroMix.value = films.kernel.ready() ? 1 : 0;
       },
     };
     return ch;
@@ -1040,6 +923,9 @@ export function createEngine(canvas: HTMLCanvasElement, opts: EngineOptions): En
     lastT = t;
     wind.uTime.value = t;
     pointerSm.lerp(pointerN, 1 - Math.pow(0.02, dt));
+
+    if (p > 0.12) films.seedling.load();
+    if (p > 0.5) films.kernel.load();
 
     const cv = covers(p);
     let first = 0;
